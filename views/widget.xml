@@ -1,3 +1,3 @@
 <Alloy>
-	<View id="parallaxContainerView"></View>
+	<View id="parallaxContainerView" />
 </Alloy>

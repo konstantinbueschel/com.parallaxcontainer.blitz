@@ -1,101 +1,140 @@
-var args = arguments[0] || {};
-
-var offset 					= 0;
-var calculatedOffset		= 0;
-var movement 				= 0;
-var bounce 					= 0; 
-var isOnScreen		 		= false; 
-
-var parallaxIntensity		= parseInt(args.parallaxIntensity) || 5 
-var parallaxItem 			= args.children && args.children[0];
-var apiname					= "";
+var LTAG = '[ParallaxContainerWidget]',
+	offset = 0,
+	calculatedOffset = 0,
+	movement = 0,
+	bounce = 0,
+	isOnScreen = false,
+	parallaxIntensity,
+	parallaxItem,
+	apiname = '';
 
 
-init(args);
-
-function init(args){
-    
-    if(args.children[0]){
-		
-		parallaxItem.height = parseInt(args.height) + parseInt(args.innerMargin); 
-		parallaxItem.top = parallaxItem._top = - args.innerMargin / 2;
-		
-		parallaxItem.addEventListener('postlayout', postlayout);
-
-		Ti.API.info("parallaxItem.top: "  + parallaxItem.top);
-			
-    	$.parallaxContainerView.add(parallaxItem);
-    }
-}
-
-function setViewWithScrollAbility(parent){
-	/*
-	 * 
-	 */ 	
- 	if(OS_IOS){
-	 	parent.addEventListener('scroll', updateScroll);
- 	}
- 	else if(OS_ANDROID){
-	 	parent.addEventListener('touchend', touchend);
-	 	parent.addEventListener('touchmove', updateScroll);
-	 }
- 	//----------------------------------------------------------------------
-	
-}
-
-
-/* postlayout is used to determine whether the UI element is on screen or not
- * AFAIK there is no UI element property which tells whether it's currently rendered on screen or not 
+/**
+ * SEF to organize otherwise inline constructor code
+ *
+ * @param  {Object} args arguments passed to the controller
+ * @returns void
  */
-function postlayout(e){
+(function constructor(args) {
 	
-	if(!isOnScreen){
-		calculatedOffset = 0;
+	parallaxIntensity = parseInt(args.parallaxIntensity) || 5;
+	parallaxItem = args.children && args.children[0];
+	
+	_init(args);
+	
+})($.args);
+
+
+function _init(args) {
+	
+	if (args.children[0]) {
+		
+		var innerMargin = parseInt(args.innerMargin);
+
+		parallaxItem.applyProperties({
+			
+			height: parseInt(args.height) + innerMargin,
+			top: -innerMargin / 2
+		});
+		
+		$._parallaxItemInitTopValue = parallaxItem.top;
+		
+		$.addListener(parallaxItem, 'postlayout', _postlayout);
+		
+		$.parallaxContainerView.add(parallaxItem);
 	}
+	
+} // END _init()
+
+
+function _setViewWithScrollAbility(parent) {
+	
+	if (OS_IOS) {
+		
+		parent.addEventListener('scroll', _updateScroll);
+	}
+	else if (OS_ANDROID) {
+		
+		parent.addEventListener('touchend', _touchend);
+		parent.addEventListener('touchmove', _updateScroll);
+	}
+	
+} // END _setViewWithScrollAbility()
+
+
+/**
+ * postlayout is used to determine whether the UI element is on screen or not
+ * AFAIK there is no UI element property which tells whether it's currently rendered on screen or not
+ *
+ * @private
+ * @param {object} event
+ * @returns void
+ */
+function _postlayout(event) {
+	
+	$.removeListener(event.source, event.type, _postlayout);
+	
+	isOnScreen || (calculatedOffset = 0);
 	
 	isOnScreen = true;
-}
-//----------------------------------------------------------------------....
+	
+	return;
+	
+} // END _postlayout()
 
 
-function updateScroll(e){
-	if(OS_IOS){
-		 parallaxItem.top = parallaxItem._top + (e.contentOffset.y  / parallaxIntensity);
+function _updateScroll(event) {
+	
+	if (OS_IOS) {
+		
+		offset = event.contentOffset.y;
 	}
-	else if (OS_ANDROID){
+	else if (OS_ANDROID) {
 		
-		if (e.source.getApiName( ) != apiname){
-				/*If start scrolling while hit a Label or any other small UI element
-				 *it might happen happen that the element changes which bubbles the touchmove event.
-				 *Cause e.y delivers relative values you have to reset the bounce when the bubbling event changes.
-				 * Otherwise the e.y value might change in an inapprioriate way. 
-				*/
-				apiname = e.source.getApiName( );
-				bounce = e.y;
+		if (event.source.getApiName() != apiname) {
+			
+			/*If start scrolling while hit a Label or any other small UI element
+			 *it might happen happen that the element changes which bubbles the touchmove event.
+			 *Cause e.y delivers relative values you have to reset the bounce when the bubbling event changes.
+			 * Otherwise the e.y value might change in an inapprioriate way.
+			 */
+			apiname = event.source.getApiName();
+			bounce = event.y;
 		}
 		
-		if(isOnScreen){
-			calculatedOffset =  ((e.y  - bounce)  * -1) + movement;
-		}
-
-		//Only update offset if it fits to the treshold
-		if(Math.abs(calculatedOffset) < Math.abs(parallaxItem._top) && calculatedOffset >= 0){
+		isOnScreen && (calculatedOffset = ((event.y - bounce) * -1) + movement);
+		
+		//Only update offset if it fits to the threshold
+		if (Math.abs(calculatedOffset) < Math.abs($._parallaxItemInitTopValue) && calculatedOffset >= 0) {
+			
 			offset = calculatedOffset;
 		}
 		
-		parallaxItem.top = parallaxItem._top + ( offset / parallaxIntensity );		
+		$._parallaxItemInitTopValue = $._parallaxItemInitTopValue + (offset / parallaxIntensity);
 	}
-};
+	
+	parallaxItem.transform = Ti.UI.create2DMatrix().translate(0, (offset / parallaxIntensity));
+	
+	return;
+	
+} // END _updateScroll()
 
-function touchend(e){
-	if (OS_ANDROID){
-			apiname = "";
-			bounce = 0;
-			movement = offset;
-			isOnScreen = false;
+
+function _touchend(event) {
+	
+	if (OS_ANDROID) {
+		
+		apiname = '';
+		bounce = 0;
+		movement = offset;
+		isOnScreen = false;
 	}
-};
+	
+	return;
+	
+} // END _touchend()
 
 
-exports.setViewWithScrollAbility = setViewWithScrollAbility;
-exports.init = init;
+// PUBLIC INTERFACE
+exports.setViewWithScrollAbility = _setViewWithScrollAbility;
+exports.init = _init;
